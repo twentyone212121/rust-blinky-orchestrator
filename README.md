@@ -1,121 +1,105 @@
 # Zephyr RTOS & Rust Integration Orchestrator
 
-A comprehensive project demonstrating embedded development with Zephyr RTOS using both C and Rust, featuring automated build and flash orchestration through Python tooling.
+Embedded development demonstration featuring Zephyr RTOS implementations in both C and Rust, with automated Python orchestration for build and flash operations.
 
-## Overview
+**Target Hardware:** NXP FRDM-MCXN947
 
-This project showcases the complete lifecycle of embedded firmware development:
-- **C Implementation**: Traditional Zephyr blinky application
-- **Rust Integration**: Modern systems programming approach with Rust on Zephyr
-- **Python Orchestration**: Automated build, flash, and logging system
+## Project Overview
 
-The orchestrator tool provides seamless automation for building and flashing both implementations while capturing comprehensive telemetry data.
+This project demonstrates:
 
-## Hardware Target
+- **C Implementation** - Standard Zephyr blinky (`c-blinky/`)
+- **Rust Implementation** - Same functionality in Rust (`rust-blinky/`)
+- **Python Orchestrator** - Automated build/flash tool with logging (`orchestrator/`)
 
-- **Board**: NXP FRDM-MCXN947
-- **MCU**: MCXN947
-- **Debugger**: LinkServer (on-board MCU-LINK)
+## Setup Instructions
 
-## Prerequisites
+### 1. Zephyr Environment
 
-### System Requirements
+Follow the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) to install:
 
-- **Operating System**: macOS, Linux, or Windows (with WSL2)
-- **Python**: 3.8 or higher
-- **Git**: For version control
+- Zephyr RTOS workspace
+- West meta-tool
+- Zephyr SDK 0.17.4+
 
-### Zephyr Development Environment
+**Install LinkServer** (NXP board programmer):
 
-1. **Zephyr SDK**: Follow the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html)
-   - Zephyr RTOS installation
-   - West meta-tool
-   - Zephyr SDK toolchain
+- Download from [NXP LinkServer](https://www.nxp.com/linkserver)
+- Add to PATH: `export PATH="/Applications/LinkServer_24.9.75:$PATH"`
 
-2. **LinkServer**: NXP LinkServer for flashing FRDM-MCXN947
-   - Download from [NXP LinkServer](https://www.nxp.com/linkserver)
-   - Add to PATH: `/Applications/LinkServer_<version>` (macOS)
-
-### Rust Toolchain
-
-1. **Rust**: Install via rustup
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
-
-2. **Zephyr Rust Support**: Follow [Zephyr Rust Documentation](https://docs.zephyrproject.org/latest/develop/languages/rust/index.html)
-   - ARM Cortex-M target support
-   - Rust embedded toolchain components
-
-### Python Dependencies
+### 2. Rust Toolchain
 
 ```bash
-cd orchestrator
-pip install -r requirements.txt
+# Install Rust 1.85.0+
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Add ARM Cortex-M33 target
+rustup target add thumbv8m.main-none-eabi
+
+# Enable Zephyr Rust module
+cd ~/zephyrproject
+west config manifest.project-filter +zephyr-lang-rust
+west update
 ```
 
-## Project Structure
-
-```
-rust-blinky-orchestrator/
-├── README.md                    # This file
-├── .gitignore                   # Git ignore patterns
-├── c-blinky/                    # C implementation
-│   ├── CMakeLists.txt
-│   ├── prj.conf
-│   ├── src/
-│   │   └── main.c
-│   └── boards/
-├── rust-blinky/                 # Rust implementation
-│   ├── CMakeLists.txt
-│   ├── prj.conf
-│   ├── Cargo.toml
-│   └── src/
-│       └── main.rs
-├── orchestrator/                # Python orchestration tool
-│   ├── orchestrator.py
-│   └── requirements.txt
-├── logs/                        # Generated logs (gitignored)
-├── docs/                        # Additional documentation
-│   └── architecture.md
-└── examples/                    # Sample logs for demonstration
-```
-
-## Quick Start
-
-### 1. Environment Setup
-
-Ensure your Zephyr environment is activated:
+### 3. Activate Environment
 
 ```bash
 cd ~/zephyrproject
 source .venv/bin/activate
 ```
 
-### 2. Build C Implementation
+## Architecture Diagram
 
-```bash
-cd ~/zephyrproject/rust-blinky-orchestrator/c-blinky
-west build -b frdm_mcxn947/mcxn947/cpu0
+```
+┌─────────────────────────────────────────────────────────┐
+│                Python Orchestrator                      │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  CLI (argparse)                                 │    │
+│  │  - build/flash commands                         │    │
+│  │  - target selection (c/rust/both)               │    │
+│  └──────────────┬──────────────────────────────────┘    │
+│                 │                                       │
+│                 v                                       │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  West Executor (subprocess)                     │    │
+│  │  - Spawns: west build / west flash              │    │
+│  │  - Captures: stdout/stderr                      │    │
+│  │  - Handles: errors, timeouts                    │    │
+│  └──────────────┬──────────────────────────────────┘    │
+│                 │                                       │
+│                 v                                       │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  Log Manager                                    │    │
+│  │  - JSON output per operation                    │    │
+│  │  - Session directories (logs/{timestamp}/)      │    │
+│  │  - Success/failure tracking                     │    │
+│  └─────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+                         │
+                         │ invokes
+                         v
+         ┌───────────────────────────────┐
+         │   West Build System           │
+         │   (Zephyr + CMake + Ninja)    │
+         └───────────────────────────────┘
+                         │
+                         v
+         ┌───────────────────────────────┐
+         │   LinkServer Programmer       │
+         │   (Flashes FRDM-MCXN947)      │
+         └───────────────────────────────┘
+                         │
+                         v
+                   [Hardware LED Blinks]
 ```
 
-### 3. Flash C Implementation
-
-Connect your FRDM-MCXN947 board and run:
-
-```bash
-west flash
-```
-
-### 4. Verify Operation
-
-The onboard LED should blink at 1 Hz.
-
-## Development Workflow
+## Execution Guide
 
 ### Manual Build & Flash
 
 **C Version:**
+
 ```bash
 cd c-blinky
 west build -b frdm_mcxn947/mcxn947/cpu0
@@ -123,70 +107,59 @@ west flash
 ```
 
 **Rust Version:**
+
 ```bash
 cd rust-blinky
-# TODO: Add Rust build commands once implemented
+west build -b frdm_mcxn947/mcxn947/cpu0
+west flash
 ```
+
+See `c-blinky/README.md` and `rust-blinky/README.md` for implementation details.
 
 ### Automated Orchestration
 
-Use the Python orchestrator to automate the entire process:
+**Output Logs:** Saved to `logs/{session-timestamp}/` in JSON format.
 
-```bash
-cd orchestrator
-python orchestrator.py --build --flash --target both
+## Sample Logs
+
+Example log files demonstrating successful operations are provided in `examples/sample-logs/`.
+
+## Project Structure
+
 ```
-
-See [Orchestrator Documentation](docs/architecture.md) for detailed usage.
-
-## Testing
-
-1. Connect FRDM-MCXN947 to your computer via USB (MCU-LINK port)
-2. Verify board is detected: `LinkServer probes`
-3. Run the orchestrator or manual build/flash commands
-4. Observe LED blinking behavior
-
-## Documentation
-
-- [Architecture Overview](docs/architecture.md) - System design and component interaction
-- [Setup Guide](docs/setup.md) - Detailed environment configuration (coming soon)
-- [API Reference](docs/api.md) - Orchestrator tool API (coming soon)
+rust-blinky-orchestrator/
+├── c-blinky/           # C implementation
+├── rust-blinky/        # Rust implementation
+├── orchestrator/       # Python automation tool
+├── docs/               # Additional documentation
+│   ├── task.md         # Original requirements
+│   └── progress.md     # Implementation tracker
+└── examples/           # Sample logs
+```
 
 ## Troubleshooting
 
-### LinkServer Not Found
+**Build Failures:**
 
-Add LinkServer to your PATH in `~/.zshrc` or `~/.bashrc`:
-```bash
-export PATH="/Applications/LinkServer_24.9.75:$PATH"
-```
+- Verify Zephyr SDK installed: `west --version`
+- Activate environment: `source ~/zephyrproject/.venv/bin/activate`
+- For Rust: Ensure module enabled and target installed
 
-Then reload: `source ~/.zshrc`
+**Flash Failures:**
 
-### No Probes Detected
+- Check board connection: `LinkServer probes`
+- Use data-capable USB cable
+- Connect to MCU-LINK/Debug port
 
-- Ensure USB cable is data-capable (not charge-only)
-- Connect to the MCU-LINK/Debug USB port on the board
-- Try different USB ports on your computer
-- Check if board is powered (LEDs should be on)
+## Status
 
-### Build Failures
+- ✅ C Implementation - Complete
+- ✅ Rust Implementation - Complete (hardware testing done)
+- ⬜ Python Orchestrator - Pending
+- ⬜ Sample Logs - Pending
 
-- Verify Zephyr SDK is properly installed
-- Activate the Python virtual environment
-- Check that west is installed: `west --version`
-- Ensure you're in the correct directory
+See `docs/progress.md` for detailed task completion status.
 
-## License
+## Author
 
-[Specify your license here]
-
-## Authors
-
-Denis Kyslytsyn
-
-## Acknowledgments
-
-- Zephyr Project for the excellent RTOS framework
-- NXP for the FRDM-MCXN947 development board
-- Rust embedded community for Zephyr integration efforts
+Denys Kyslytsyn
