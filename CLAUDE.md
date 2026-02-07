@@ -283,14 +283,11 @@ west build -t rustdoc
 ### Rust Commands
 
 ```bash
-# Add target
-rustup target add thumbv8m.main-none-eabihf
+# Add target (software float, not hardware float)
+rustup target add thumbv8m.main-none-eabi
 
 # Check installed targets
 rustup target list --installed
-
-# Clippy for linting
-cargo clippy
 ```
 
 ### Debugging
@@ -318,6 +315,118 @@ west build -v
 
 ---
 
+## Rust Implementation Lessons Learned
+
+### Critical Issue: Devicetree Code Generation Bug
+
+**Problem Encountered:**
+The Zephyr Rust devicetree binding generator produces broken code for the FRDM-MCXN947 board:
+
+```
+error[E0425]: cannot find function `get_instance_raw` in module `super::super::super`
+    --> devicetree.rs:5693:67
+```
+
+**Root Cause:**
+
+- Bug in `modules/lang/rust/dt-rust.yaml` flash-partition binding generation
+- The generated code tries to call `super::super::super::get_instance_raw()` for flash partitions
+- This function doesn't exist in that module scope for this board's devicetree structure
+- Affects both internal flash (`&flash`) and external QSPI flash (`&w25q64jvssiq`) partitions
+
+**Why This Happens:**
+
+- The default `dt-rust.yaml` assumes a certain devicetree hierarchy for flash devices
+- FRDM-MCXN947's flash partition structure doesn't match these assumptions
+- Even the official Zephyr Rust blinky sample fails to build for this board (only tested on Nordic/QEMU)
+
+**Solution Implemented:**
+
+1. Created custom `rust-blinky/dt-rust.yaml` that **excludes** the flash-partition rule
+2. Modified `rust-blinky/CMakeLists.txt` to override DT_AUGMENTS:
+   ```cmake
+   set(DT_AUGMENTS "${CMAKE_CURRENT_SOURCE_DIR}/dt-rust.yaml" CACHE INTERNAL "" FORCE)
+   ```
+3. This prevents flash partition Rust bindings from being generated (but GPIO/LED still works)
+
+**Files Modified:**
+
+- `rust-blinky/dt-rust.yaml` - Custom mapping without flash-partition support
+- `rust-blinky/CMakeLists.txt` - DT_AUGMENTS override
+
+**Trade-offs:**
+
+- ✅ GPIO, LEDs, timers, and other devicetree nodes work fine
+- ❌ Cannot access flash partitions from Rust code
+- ✅ Blinky functionality unaffected (doesn't need flash API)
+
+### API Compatibility Issues
+
+**Issue:** Sample code from Zephyr uses outdated constant names
+
+- Old: `GPIO_OUTPUT_ACTIVE`
+- New: `ZR_GPIO_OUTPUT_ACTIVE`
+
+**Fix:** Updated `src/lib.rs` to use prefixed constants
+
+### Cargo Configuration Challenges
+
+**Problem:** Zephyr Rust crates (`zephyr`, `zephyr-build`, `zephyr-sys`) are NOT published to crates.io
+
+**Solution:**
+
+- Create `.cargo/config.toml` with path patches (but DON'T commit - setup dependent)
+- Use relative paths: `../../modules/lang/rust/zephyr`
+- Add `.cargo/` to `.gitignore`
+- Document setup requirement in README
+
+**IDE Support:**
+
+- rust-analyzer cannot run Zephyr build scripts (they need CMake environment variables)
+- Create `.zed/settings.json` to disable build scripts: `"buildScripts": {"enable": false}`
+- Accept that devicetree symbol resolution won't work in IDE
+- Use `west build` as source of truth for correctness
+
+### Target Architecture
+
+**Correct Target:** `thumbv8m.main-none-eabi` (software float)
+
+**Common Mistake:** Using `thumbv8m.main-none-eabihf` (hardware float)
+
+- The MCXN947 has hardware FPU, but Zephyr's config doesn't use it by default
+- Build system selects based on `CONFIG_FP_HARDABI` in Kconfig
+
+### Workaround Validation
+
+**How to verify the fix works:**
+
+```bash
+cd rust-blinky
+west build -p always -b frdm_mcxn947/mcxn947/cpu0
+
+# Should see:
+# Memory region         Used Size  Region Size  %age Used
+#            FLASH:       50992 B         2 MB      2.43%
+#              RAM:       12832 B       320 KB      3.92%
+```
+
+### Future Considerations
+
+**If Zephyr fixes the upstream bug:**
+
+1. Remove custom `dt-rust.yaml`
+2. Remove `DT_AUGMENTS` override from `CMakeLists.txt`
+3. Revert to default Zephyr Rust devicetree generation
+4. Flash partition APIs will become available
+
+**Tracking the Bug:**
+
+- Check Zephyr GitHub issues for flash partition + Rust devicetree
+- Test with: `cd modules/lang/rust/samples/blinky && west build -b frdm_mcxn947/mcxn947/cpu0`
+- If it builds without our workaround, upstream is fixed
+
+---
+
 ## Next Steps for AI Agents
 
 When continuing work on this project:
@@ -331,4 +440,4 @@ When continuing work on this project:
 ---
 
 **Last Updated**: 2026-02-07
-**Status**: C blinky complete, Rust & orchestrator pending
+**Status**: C blinky complete ✅, Rust blinky complete ✅ (hardware testing pending), orchestrator pending ⬜

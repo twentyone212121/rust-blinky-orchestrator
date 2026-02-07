@@ -11,22 +11,6 @@ build/
 zephyr.dts
 zephyr.dts.pre
 
-# Rust
-rust-blinky/target/
-**/*.rs.bk
-Cargo.lock
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-ENV/
-env/
-
 # Logs (exclude sample logs in examples/)
 logs/*.log
 logs/*.json
@@ -49,3 +33,5 @@ logs/*.sqlite
 *.tmp
 *.bak
 *.old
+
+.claude

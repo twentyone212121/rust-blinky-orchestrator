@@ -24,7 +24,7 @@ implementation and final automation.
 3. Python Orchestration Tool
    - Framework: Write a Python-based orchestrator that utilizes the west meta-tool
      framework.
-   - Automation: The script must programmatically execute the west build and west Ųash
+   - Automation: The script must programmatically execute the west build and west flash
      commands for both the C and Rust versions.
    - Telemetry & Logging: Capture and store all command-line outputs (STDOUT/STDERR)
      into organized log files or a structured database (e.g., JSON or SQLite) for audit
