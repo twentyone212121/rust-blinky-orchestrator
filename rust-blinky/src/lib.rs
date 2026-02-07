@@ -1,11 +1,4 @@
-// Copyright (c) 2024 Linaro LTD
-// SPDX-License-Identifier: Apache-2.0
-
 #![no_std]
-// Sigh. The check config system requires that the compiler be told what possible config values
-// there might be.  This is completely impossible with both Kconfig and the DT configs, since the
-// whole point is that we likely need to check for configs that aren't otherwise present in the
-// build.  So, this is just always necessary.
 #![allow(unexpected_cfgs)]
 
 use log::warn;
