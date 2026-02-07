@@ -1,0 +1,23 @@
+# Build artifacts
+build/
+target/
+
+# Cargo local config (setup-dependent)
+.cargo/
+
+# Cargo lock for libraries (keep for applications)
+# Cargo.lock  # Uncomment if this becomes a library
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Zed local state (but keep settings)
+.zed/
+!.zed/settings.json
+
+# macOS
+.DS_Store

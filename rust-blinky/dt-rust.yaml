@@ -1,0 +1,47 @@
+# Custom devicetree-to-Rust mapping for FRDM-MCXN947
+# Based on zephyr-lang-rust/dt-rust.yaml but with flash-partition rule removed
+# to work around code generation bug for this board
+
+# Gpio controllers match for every node that has a `gpio-controller` property.
+- name: gpio-controller
+  rules:
+    - !HasProp gpio-controller
+  actions:
+    - !Instance
+      raw: !Myself
+      device: crate::device::gpio::Gpio
+      static_type: crate::device::gpio::GpioStatic
+
+# The gpio-leds node will have #children nodes describing each led.
+- name: gpio-leds
+  rules:
+    - !Compatible
+      names: [gpio-leds]
+      level: 1
+  actions:
+    - !Instance
+      raw: !Phandle gpios
+      device: crate::device::gpio::GpioPin
+
+# Flash controllers
+- name: flash-controller
+  rules:
+    - !Compatible
+      names:
+        - "nordic,nrf52-flash-controller"
+        - "nordic,nrf51-flash-controller"
+        - "raspberrypi,pico-flash-controller"
+        - "zephyr,sim-flash"
+      level: 0
+  actions:
+    - !Instance
+      raw: !Myself
+      device: crate::device::flash::FlashController
+
+# NOTE: flash-partition rule removed to work around FRDM-MCXN947 generation bug
+
+# Generate a pseudo node that matches all of the labels across the tree with their nodes.
+- name: labels
+  rules: !Root
+  actions:
+    - !Labels
