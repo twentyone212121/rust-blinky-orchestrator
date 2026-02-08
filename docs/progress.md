@@ -52,23 +52,25 @@
 
 ---
 
-## Phase 3: Python Orchestrator ⬜ NOT STARTED
+## Phase 3: Python Orchestrator ✅ COMPLETE
 
-### Core Modules
+### Core Modules (uv project at `orchestrator/`)
 
-- [ ] Create `orchestrator/config.py` (paths, project configs)
-- [ ] Create `orchestrator/west_executor.py` (subprocess management)
-- [ ] Create `orchestrator/log_manager.py` (JSON logging)
-- [ ] Create `orchestrator/orchestrator.py` (main CLI with argparse)
-- [ ] Create `orchestrator/requirements.txt`
+- [x] Create `orchestrator/pyproject.toml` (uv project, hatchling, `orch` entry point)
+- [x] Create `orchestrator/src/orchestrator/__init__.py` (version)
+- [x] Create `orchestrator/src/orchestrator/__main__.py` (`python -m` support)
+- [x] Create `orchestrator/src/orchestrator/core.py` (ExecutionResult + WestExecutor)
+- [x] Create `orchestrator/src/orchestrator/logger.py` (JSON session logging)
+- [x] Create `orchestrator/src/orchestrator/cli.py` (argparse CLI: build/flash/run)
 
 ### Testing
 
-- [ ] Test CLI help: `python orchestrator.py --help`
-- [ ] Test build both: `python orchestrator.py build --target both`
-- [ ] Test flash: `python orchestrator.py flash --target both`
-- [ ] Verify JSON logs created in `logs/{session}/`
-- [ ] Test error handling (disconnect board, verify graceful failure)
+- [x] Test CLI help: `uv run orch --help`
+- [x] Test build: `uv run orch build ../c-blinky --pristine --verbose`
+- [x] Verify JSON logs created in `logs/{session}/`
+- [x] Test error handling (nonexistent dir, missing CMakeLists.txt)
+- [ ] Test flash: `uv run orch flash ../c-blinky` (requires board connected)
+- [ ] Test run: `uv run orch run ../c-blinky` (requires board connected)
 
 ---
 
@@ -105,10 +107,10 @@
 
 **Phase 1**: ✅ Complete (3/3 tasks)
 **Phase 2**: ✅ Complete (10/10 tasks)
-**Phase 3**: ⬜ Not Started (0/10 tasks)
+**Phase 3**: ✅ Complete (10/12 tasks, 2 require hardware)
 **Phase 4**: ⏳ In Progress (2/9 tasks)
 
-**Overall Progress**: 15/32 tasks completed (47%)
+**Overall Progress**: 25/34 tasks completed (74%)
 
 ---
 

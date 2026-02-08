@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zephyr-orchestrator"
+version = "0.1.0"
+description = "Build and flash orchestrator for Zephyr RTOS projects"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+orch = "orchestrator.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/orchestrator"]
+
+[tool.ruff]
+line-length = 100
