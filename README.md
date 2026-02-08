@@ -71,8 +71,8 @@ source .venv/bin/activate
 │                 v                                       │
 │  ┌─────────────────────────────────────────────────┐    │
 │  │  Log Manager                                    │    │
-│  │  - JSON output per operation                    │    │
-│  │  - Session directories (logs/{timestamp}/)      │    │
+│  │  - JSONL append to logs/orchestrator.jsonl      │    │
+│  │  - Session ID correlates related entries        │    │
 │  │  - Success/failure tracking                     │    │
 │  └─────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
@@ -118,7 +118,29 @@ See `c-blinky/README.md` and `rust-blinky/README.md` for implementation details.
 
 ### Automated Orchestration
 
-**Output Logs:** Saved to `logs/{session-timestamp}/` in JSON format.
+```bash
+cd orchestrator
+
+# Build a project
+uv run orch build ../c-blinky
+uv run orch build ../rust-blinky --pristine
+
+# Flash a project
+uv run orch flash ../c-blinky
+
+# Build + flash in one step
+uv run orch run ../c-blinky
+
+# Verbose output (stream west output in real-time)
+uv run orch build ../c-blinky -v
+```
+
+**Output Logs:** All operations are appended to `logs/orchestrator.jsonl`. Each line is a compact JSON object with a `session_id` to correlate entries from the same invocation.
+
+```jsonl
+{"type": "operation", "session_id": "20260207_203757", "project": "c-blinky", "operation": "build", "board": "frdm_mcxn947/mcxn947/cpu0", "success": true, ...}
+{"type": "summary", "session_id": "20260207_203757", "total_duration_seconds": 14.7, "all_succeeded": true, ...}
+```
 
 ## Sample Logs
 
@@ -155,7 +177,7 @@ rust-blinky-orchestrator/
 
 - ✅ C Implementation - Complete
 - ✅ Rust Implementation - Complete (hardware testing done)
-- ⬜ Python Orchestrator - Pending
+- ✅ Python Orchestrator - Complete (JSONL logging)
 - ⬜ Sample Logs - Pending
 
 See `docs/progress.md` for detailed task completion status.

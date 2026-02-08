@@ -9,7 +9,7 @@
 **Name**: Zephyr RTOS & Rust Integration Orchestrator
 **Goal**: Demonstrate embedded development proficiency with Zephyr RTOS using both C and Rust, featuring automated build/flash orchestration through Python
 
-**Current Status**: C blinky implementation complete ✅, Rust integration and Python orchestrator pending
+**Current Status**: C blinky ✅, Rust blinky ✅, Python orchestrator ✅, documentation/sample-logs remaining
 
 ---
 
@@ -29,86 +29,87 @@
 
 ```
 rust-blinky-orchestrator/
-├── c-blinky/              # ✅ Complete - C implementation
+├── c-blinky/              # ✅ C implementation
 │   ├── src/main.c         # GPIO blinky (2000ms toggle)
 │   ├── CMakeLists.txt
 │   ├── prj.conf
 │   └── boards/*.overlay
-├── rust-blinky/           # 🚧 To be implemented
-├── orchestrator/          # 🚧 To be implemented
+├── rust-blinky/           # ✅ Rust implementation
+│   ├── src/lib.rs         # GPIO blinky (200ms toggle)
+│   ├── Cargo.toml         # name = "rustapp", staticlib
+│   ├── CMakeLists.txt     # rust_cargo_application() + DT_AUGMENTS override
+│   ├── dt-rust.yaml       # Custom devicetree mapping (flash partition workaround)
+│   ├── build.rs           # Devicetree code generation
+│   └── prj.conf
+├── orchestrator/          # ✅ Python build/flash tool (uv project)
+│   ├── pyproject.toml     # entry point: "orch"
+│   └── src/orchestrator/
+│       ├── cli.py         # argparse CLI: build/flash/run subcommands
+│       ├── core.py        # ExecutionResult dataclass + WestExecutor
+│       └── logger.py      # JSONL append logger (logs/orchestrator.jsonl)
 ├── docs/
 │   ├── task.md           # Original requirements
-│   ├── progress.md       # Checklist tracker
+│   ├── progress.md       # Checklist tracker (check this first!)
 │   └── architecture.md   # (to be created)
 ├── logs/                 # Generated during orchestrator runs
-└── examples/sample-logs/ # Reference logs
+└── examples/sample-logs/ # Reference logs (to be generated)
 ```
+
+---
+
+## What's Already Done
+
+### C Blinky (`c-blinky/`)
+- Standard Zephyr GPIO blinky using devicetree API
+- LED via `led0` alias, 2000ms toggle, prints "LED state: ON/OFF"
+- Builds and flashes successfully
+
+### Rust Blinky (`rust-blinky/`)
+- `#![no_std]` bare-metal, uses `zephyr` crate for GPIO
+- 200ms toggle (faster for visual feedback)
+- Required workaround for devicetree flash partition code generation bug (see Lessons Learned below)
+- Builds successfully, hardware-tested
+
+### Python Orchestrator (`orchestrator/`)
+- **uv project** — run with `uv run orch <command>`
+- Three subcommands: `build`, `flash`, `run` (build+flash)
+- **JSONL logging** — appends to single `logs/orchestrator.jsonl` file
+- Each JSON line has a `type` field (`"operation"` or `"summary"`) and a `session_id`
+- `ExecutionResult` dataclass carries: project_name, operation, success, return_code, duration_seconds, stdout, stderr, command, board
+
+#### Orchestrator CLI Usage
+
+```bash
+cd orchestrator
+uv run orch build ../c-blinky                     # build c-blinky
+uv run orch build ../rust-blinky --pristine        # clean build rust-blinky
+uv run orch flash ../c-blinky                      # flash
+uv run orch run ../c-blinky -b frdm_mcxn947/mcxn947/cpu0  # build + flash
+uv run orch build ../c-blinky -v                   # verbose (stream output)
+```
+
+#### JSONL Log Format
+
+Each run appends lines to `logs/orchestrator.jsonl`:
+
+```jsonl
+{"type": "operation", "session_id": "20260207_203757", "timestamp": "...", "project": "c-blinky", "operation": "build", "board": "frdm_mcxn947/mcxn947/cpu0", "command": ["west", "build", "-b", "frdm_mcxn947/mcxn947/cpu0"], "success": true, "return_code": 0, "duration_seconds": 14.7, "stdout": "...", "stderr": "..."}
+{"type": "summary", "session_id": "20260207_203757", "timestamp": "...", "total_duration_seconds": 14.8, "operations": [{"project": "c-blinky", "operation": "build", "success": true, "duration_seconds": 14.7}], "all_succeeded": true}
+```
+
+---
+
+## What Remains (check `docs/progress.md` for details)
+
+- [ ] Create `docs/architecture.md` (system diagram, component flow)
+- [ ] Generate sample logs in `examples/sample-logs/`
+- [ ] Fix board naming in C blinky overlay (nrf54h20dk → frdm_mcxn947)
+- [ ] Hardware test: `uv run orch flash ../c-blinky` and `uv run orch run ../c-blinky`
+- [ ] Full end-to-end verification with both projects
 
 ---
 
 ## Key Technical Details
-
-### C Blinky Implementation (Reference)
-
-**File**: `c-blinky/src/main.c`
-
-- Uses Zephyr's GPIO devicetree API
-- LED accessed via `led0` alias from devicetree
-- Toggle interval: 2000ms (defined as `SLEEP_TIME_MS`)
-- Prints LED state to console: "LED state: ON/OFF"
-- Error handling: checks GPIO ready and configuration return codes
-
-**Build Command**: `west build -b frdm_mcxn947/mcxn947/cpu0`
-**Flash Command**: `west flash`
-
-### Rust Integration Requirements
-
-**Rust Target**: `thumbv8m.main-none-eabihf` (ARM Cortex-M33 with hardware float)
-
-**Zephyr Rust Module**:
-
-- Optional module: `zephyr-lang-rust`
-- Enable with: `west config manifest.project-filter +zephyr-lang-rust && west update`
-- Located at: `modules/lang/rust/` after enabling
-- Provides: CMake macros (`rust_cargo_application()`), `zephyr` crate for hardware abstraction
-
-**Critical Constraints**:
-
-- Package name MUST be `"rustapp"` in Cargo.toml (Zephyr requirement)
-- Crate type MUST be `["staticlib"]`
-- Use `#![no_std]` for bare-metal
-- Entry point: `#[no_mangle] pub extern "C" fn main()`
-- Use `src/lib.rs` NOT `src/main.rs`
-
-### Python Orchestrator Requirements
-
-**Purpose**: Automate `west build` and `west flash` for both C and Rust implementations
-
-**Key Features**:
-
-- Subprocess management with real-time output capture
-- JSON-based logging (timestamped sessions)
-- Error handling (build failures, board disconnects)
-- CLI interface with argparse
-
-**Logging Format**:
-
-```json
-{
-  "timestamp": "ISO8601",
-  "project": "c-blinky",
-  "operation": "build",
-  "success": true,
-  "return_code": 0,
-  "duration_seconds": 45.3,
-  "stdout": "...",
-  "stderr": "..."
-}
-```
-
----
-
-## Important Patterns & Conventions
 
 ### Build System Integration
 
@@ -130,22 +131,27 @@ project(rust_blinky)
 rust_cargo_application()
 ```
 
+### Critical Rust Constraints
+
+- Package name MUST be `"rustapp"` in Cargo.toml
+- Crate type MUST be `["staticlib"]`
+- Use `#![no_std]` for bare-metal
+- Entry point: `#[no_mangle] pub extern "C" fn main()`
+- Use `src/lib.rs` NOT `src/main.rs`
+- Rust target: `thumbv8m.main-none-eabi` (software float, **not** `eabihf`)
+
 ### Device Tree Overlay Naming
 
 **Convention**: Board identifier with underscores, not slashes
-
-- ❌ Wrong: `nrf54h20dk_nrf54h20_cpuppr.overlay` (copied from sample)
-- ✅ Correct: `frdm_mcxn947_mcxn947_cpu0.overlay`
-
-Place in: `{project}/boards/{overlay_name}.overlay`
+- Correct: `frdm_mcxn947_mcxn947_cpu0.overlay`
+- Place in: `{project}/boards/{overlay_name}.overlay`
 
 ### West Command Execution
 
-Always activate venv and execute from project directory:
+Always activate venv first:
 
 ```bash
-cd /Users/deniskyslytsyn/zephyrproject
-source .venv/bin/activate
+source /Users/deniskyslytsyn/zephyrproject/.venv/bin/activate
 cd rust-blinky-orchestrator/{project}
 west build -b frdm_mcxn947/mcxn947/cpu0
 west flash
@@ -158,149 +164,71 @@ west flash
 ### Pitfall 1: Rust Target Mismatch
 
 **Issue**: Build fails with "error: couldn't find crate for target"
-
-**Solution**: Install correct ARM Cortex-M33 target
-
-```bash
-rustup target add thumbv8m.main-none-eabihf
-```
+**Solution**: `rustup target add thumbv8m.main-none-eabi` (software float, not `eabihf`)
 
 ### Pitfall 2: Wrong Cargo Package Name
 
 **Issue**: CMake error: "Could not find rustapp staticlib"
+**Solution**: Ensure `name = "rustapp"` and `crate-type = ["staticlib"]` in Cargo.toml
 
-**Solution**: Ensure Cargo.toml has:
-
-```toml
-[package]
-name = "rustapp"  # MUST be exactly this
-
-[lib]
-crate-type = ["staticlib"]
-```
-
-### Pitfall 3: Subprocess Deadlocks
-
-**Issue**: Python orchestrator hangs during large builds
-
-**Solution**: Use non-blocking subprocess with proper buffering
-
-```python
-proc = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE, text=True)
-# Read stdout/stderr in real-time or with threading
-```
-
-### Pitfall 4: Board Naming Inconsistency
-
-**Issue**: C blinky overlay references wrong board (nrf54h20dk vs frdm_mcxn947)
-
-**Solution**: This is a naming artifact from copying Zephyr samples. The actual board is FRDM-MCXN947. Rename overlay files to match proper convention.
-
-### Pitfall 5: Missing Rust Module
+### Pitfall 3: Missing Rust Module
 
 **Issue**: CMake error: "Unknown CMake command: rust_cargo_application"
+**Solution**: `west config manifest.project-filter +zephyr-lang-rust && west update`
 
-**Solution**: Enable the optional Rust module
+### Pitfall 4: Devicetree API Names
 
-```bash
-west config manifest.project-filter +zephyr-lang-rust
-west update
+**Issue**: Sample code uses `GPIO_OUTPUT_ACTIVE`
+**Solution**: Use `ZR_GPIO_OUTPUT_ACTIVE` (new API naming convention)
+
+### Pitfall 5: Zephyr Rust Crates Not on crates.io
+
+**Solution**: Create `.cargo/config.toml` with path patches (relative to `../../modules/lang/rust/zephyr`). Don't commit — it's setup-dependent. Add `.cargo/` to `.gitignore`.
+
+### Pitfall 6: rust-analyzer Doesn't Work
+
+**Reason**: Build scripts need CMake environment variables that rust-analyzer can't provide
+**Workaround**: Disable build scripts in IDE settings. Use `west build` as source of truth.
+
+---
+
+## Rust Implementation Lessons Learned
+
+### Critical Issue: Devicetree Code Generation Bug
+
+**Problem**: Zephyr Rust devicetree binding generator produces broken code for FRDM-MCXN947 flash partitions:
+```
+error[E0425]: cannot find function `get_instance_raw` in module `super::super::super`
 ```
 
-### Pitfall 6: Devicetree API Confusion
+**Root Cause**: Bug in `modules/lang/rust/dt-rust.yaml` — flash partition binding generation assumes a devicetree hierarchy that doesn't match this board.
 
-**Issue**: Rust devicetree macros differ from C API
+**Solution Implemented**:
+1. Created custom `rust-blinky/dt-rust.yaml` excluding the flash-partition rule
+2. Modified `rust-blinky/CMakeLists.txt` to override `DT_AUGMENTS`
+3. GPIO/LED/timers work fine; only flash partition APIs are unavailable
 
-**Solution**: Reference sample code in `modules/lang/rust/samples/` for correct API usage. Use `west build -t rustdoc` to generate local API documentation.
-
----
-
-## Testing Strategy
-
-### Rust Blinky Testing
-
-1. **Build test**: `west build -b frdm_mcxn947/mcxn947/cpu0` → expect clean build
-2. **Flash test**: `west flash` → expect successful flash
-3. **Functional test**: LED should blink at 2000ms intervals (same as C version)
-4. **Console test**: UART output should show "LED state: ON/OFF" messages
-
-### Orchestrator Testing
-
-1. **CLI test**: `python orchestrator.py --help` → verify all flags
-2. **Build test**: `python orchestrator.py build --target both` → both projects build
-3. **Flash test**: `python orchestrator.py flash --target both` → both flash successfully
-4. **Log test**: Verify JSON logs created in `logs/{session}/`
-5. **Error test**: Disconnect board, verify graceful error handling
+**If upstream fixes this**: Remove `dt-rust.yaml` and the `DT_AUGMENTS` override from CMakeLists.txt. Test with: `cd modules/lang/rust/samples/blinky && west build -b frdm_mcxn947/mcxn947/cpu0`
 
 ---
 
-## Code Quality Standards
-
-**C**:
-
-- Follow Zephyr coding style
-- Use devicetree macros for hardware abstraction
-- Include error checking on all GPIO operations
-
-**Rust**:
-
-- Use `#![no_std]` for bare-metal
-- Run `cargo clippy` for idiomatic code
-- Comment FFI boundaries and Zephyr-specific patterns
-- Use Result types for error handling
-
-**Python**:
-
-- Type hints throughout
-- Docstrings for all public functions
-- PEP 8 formatting
-- Use dataclasses for configuration
-- consider using uv
-
----
-
-## Useful Commands Reference
-
-### Zephyr/West Commands
+## Useful Commands
 
 ```bash
 # Activate environment
 source /Users/deniskyslytsyn/zephyrproject/.venv/bin/activate
 
-# Build with pristine (clean) build
+# Build (clean)
 west build -p always -b frdm_mcxn947/mcxn947/cpu0
 
-# Flash to board
+# Flash
 west flash
 
-# View build configuration
-west build -t menuconfig
+# Orchestrator
+cd orchestrator && uv run orch build ../c-blinky
 
-# Generate Rust docs (if Rust module enabled)
-west build -t rustdoc
-```
-
-### Rust Commands
-
-```bash
-# Add target (software float, not hardware float)
-rustup target add thumbv8m.main-none-eabi
-
-# Check installed targets
-rustup target list --installed
-```
-
-### Debugging
-
-```bash
-# View west configuration
-west config -l
-
-# Check for board support
-west boards | grep frdm
-
-# Verbose build output
-west build -v
+# Check JSONL logs
+python3 -c "import json; [print(json.loads(l)['type'], json.loads(l)['session_id']) for l in open('logs/orchestrator.jsonl')]"
 ```
 
 ---
@@ -312,132 +240,19 @@ west build -v
 - **Rust**: 1.85.0 or later
 - **LinkServer**: For flashing NXP boards
 - **CMake**: 3.20.0+
+- **uv**: For running the orchestrator (`uv run orch`)
 
 ---
 
-## Rust Implementation Lessons Learned
+## For AI Agents: How to Continue
 
-### Critical Issue: Devicetree Code Generation Bug
-
-**Problem Encountered:**
-The Zephyr Rust devicetree binding generator produces broken code for the FRDM-MCXN947 board:
-
-```
-error[E0425]: cannot find function `get_instance_raw` in module `super::super::super`
-    --> devicetree.rs:5693:67
-```
-
-**Root Cause:**
-
-- Bug in `modules/lang/rust/dt-rust.yaml` flash-partition binding generation
-- The generated code tries to call `super::super::super::get_instance_raw()` for flash partitions
-- This function doesn't exist in that module scope for this board's devicetree structure
-- Affects both internal flash (`&flash`) and external QSPI flash (`&w25q64jvssiq`) partitions
-
-**Why This Happens:**
-
-- The default `dt-rust.yaml` assumes a certain devicetree hierarchy for flash devices
-- FRDM-MCXN947's flash partition structure doesn't match these assumptions
-- Even the official Zephyr Rust blinky sample fails to build for this board (only tested on Nordic/QEMU)
-
-**Solution Implemented:**
-
-1. Created custom `rust-blinky/dt-rust.yaml` that **excludes** the flash-partition rule
-2. Modified `rust-blinky/CMakeLists.txt` to override DT_AUGMENTS:
-   ```cmake
-   set(DT_AUGMENTS "${CMAKE_CURRENT_SOURCE_DIR}/dt-rust.yaml" CACHE INTERNAL "" FORCE)
-   ```
-3. This prevents flash partition Rust bindings from being generated (but GPIO/LED still works)
-
-**Files Modified:**
-
-- `rust-blinky/dt-rust.yaml` - Custom mapping without flash-partition support
-- `rust-blinky/CMakeLists.txt` - DT_AUGMENTS override
-
-**Trade-offs:**
-
-- ✅ GPIO, LEDs, timers, and other devicetree nodes work fine
-- ❌ Cannot access flash partitions from Rust code
-- ✅ Blinky functionality unaffected (doesn't need flash API)
-
-### API Compatibility Issues
-
-**Issue:** Sample code from Zephyr uses outdated constant names
-
-- Old: `GPIO_OUTPUT_ACTIVE`
-- New: `ZR_GPIO_OUTPUT_ACTIVE`
-
-**Fix:** Updated `src/lib.rs` to use prefixed constants
-
-### Cargo Configuration Challenges
-
-**Problem:** Zephyr Rust crates (`zephyr`, `zephyr-build`, `zephyr-sys`) are NOT published to crates.io
-
-**Solution:**
-
-- Create `.cargo/config.toml` with path patches (but DON'T commit - setup dependent)
-- Use relative paths: `../../modules/lang/rust/zephyr`
-- Add `.cargo/` to `.gitignore`
-- Document setup requirement in README
-
-**IDE Support:**
-
-- rust-analyzer cannot run Zephyr build scripts (they need CMake environment variables)
-- Create `.zed/settings.json` to disable build scripts: `"buildScripts": {"enable": false}`
-- Accept that devicetree symbol resolution won't work in IDE
-- Use `west build` as source of truth for correctness
-
-### Target Architecture
-
-**Correct Target:** `thumbv8m.main-none-eabi` (software float)
-
-**Common Mistake:** Using `thumbv8m.main-none-eabihf` (hardware float)
-
-- The MCXN947 has hardware FPU, but Zephyr's config doesn't use it by default
-- Build system selects based on `CONFIG_FP_HARDABI` in Kconfig
-
-### Workaround Validation
-
-**How to verify the fix works:**
-
-```bash
-cd rust-blinky
-west build -p always -b frdm_mcxn947/mcxn947/cpu0
-
-# Should see:
-# Memory region         Used Size  Region Size  %age Used
-#            FLASH:       50992 B         2 MB      2.43%
-#              RAM:       12832 B       320 KB      3.92%
-```
-
-### Future Considerations
-
-**If Zephyr fixes the upstream bug:**
-
-1. Remove custom `dt-rust.yaml`
-2. Remove `DT_AUGMENTS` override from `CMakeLists.txt`
-3. Revert to default Zephyr Rust devicetree generation
-4. Flash partition APIs will become available
-
-**Tracking the Bug:**
-
-- Check Zephyr GitHub issues for flash partition + Rust devicetree
-- Test with: `cd modules/lang/rust/samples/blinky && west build -b frdm_mcxn947/mcxn947/cpu0`
-- If it builds without our workaround, upstream is fixed
+1. **Check `docs/progress.md`** first — it has the authoritative checklist
+2. **Don't re-implement** anything marked ✅ above unless asked to modify it
+3. **Test orchestrator changes** with: `cd orchestrator && uv run orch build ../c-blinky`
+4. **Logs go to** `logs/orchestrator.jsonl` (single JSONL file, append mode)
+5. **Update `docs/progress.md`** when completing tasks
 
 ---
 
-## Next Steps for AI Agents
-
-When continuing work on this project:
-
-1. **Check `docs/progress.md`** to see what's already completed
-2. **Reference C blinky** (`c-blinky/src/main.c`) as the functional specification
-3. **Follow the implementation order**: Environment setup → Rust blinky → Python orchestrator → Documentation
-4. **Test incrementally**: Build and verify each component before moving to the next
-5. **Update progress.md**: Check off completed tasks as you go
-
----
-
-**Last Updated**: 2026-02-07
-**Status**: C blinky complete ✅, Rust blinky complete ✅ (hardware testing pending), orchestrator pending ⬜
+**Last Updated**: 2026-02-08
+**Status**: C blinky ✅, Rust blinky ✅, Orchestrator ✅, Docs/samples remaining

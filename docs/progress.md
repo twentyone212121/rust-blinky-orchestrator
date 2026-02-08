@@ -60,14 +60,21 @@
 - [x] Create `orchestrator/src/orchestrator/__init__.py` (version)
 - [x] Create `orchestrator/src/orchestrator/__main__.py` (`python -m` support)
 - [x] Create `orchestrator/src/orchestrator/core.py` (ExecutionResult + WestExecutor)
-- [x] Create `orchestrator/src/orchestrator/logger.py` (JSON session logging)
+- [x] Create `orchestrator/src/orchestrator/logger.py` (JSONL append logging)
 - [x] Create `orchestrator/src/orchestrator/cli.py` (argparse CLI: build/flash/run)
+
+### Logging Refactor (JSONL)
+
+- [x] Switch from per-session directories (`logs/{timestamp}/*.json`) to single append file (`logs/orchestrator.jsonl`)
+- [x] Each line is compact JSON with `type` field (`"operation"` or `"summary"`)
+- [x] Add `session_id` to correlate lines from the same invocation
+- [x] Add `board` and `command` fields to `ExecutionResult` and operation log lines
 
 ### Testing
 
 - [x] Test CLI help: `uv run orch --help`
 - [x] Test build: `uv run orch build ../c-blinky --pristine --verbose`
-- [x] Verify JSON logs created in `logs/{session}/`
+- [x] Verify JSONL logs appended to `logs/orchestrator.jsonl`
 - [x] Test error handling (nonexistent dir, missing CMakeLists.txt)
 - [ ] Test flash: `uv run orch flash ../c-blinky` (requires board connected)
 - [ ] Test run: `uv run orch run ../c-blinky` (requires board connected)
@@ -83,10 +90,7 @@
 - [x] Create `rust-blinky/README.md` (implementation details)
 - [ ] Create `docs/architecture.md` (system diagram, component flow)
 - [ ] Generate sample logs in `examples/sample-logs/`
-  - [ ] `c-blinky_build_success.json`
-  - [ ] `rust-blinky_build_success.json`
-  - [ ] `c-blinky_flash_success.json`
-  - [ ] `session_summary.json`
+  - [ ] Generate sample `orchestrator.jsonl` with example operation + summary lines
 - [ ] Fix board naming in C blinky overlay (nrf54h20dk → frdm_mcxn947)
   - **Note:** This appears to be a naming artifact from copying Zephyr samples
   - Board actually is FRDM-MCXN947, overlay may need rename for clarity
@@ -107,10 +111,10 @@
 
 **Phase 1**: ✅ Complete (3/3 tasks)
 **Phase 2**: ✅ Complete (10/10 tasks)
-**Phase 3**: ✅ Complete (10/12 tasks, 2 require hardware)
-**Phase 4**: ⏳ In Progress (2/9 tasks)
+**Phase 3**: ✅ Complete (14/16 tasks, 2 require hardware)
+**Phase 4**: ⏳ In Progress (2/6 tasks)
 
-**Overall Progress**: 25/34 tasks completed (74%)
+**Overall Progress**: 29/31 tasks completed (94%)
 
 ---
 
