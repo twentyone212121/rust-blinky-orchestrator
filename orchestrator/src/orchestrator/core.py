@@ -16,6 +16,8 @@ class ExecutionResult:
     duration_seconds: float
     stdout: str
     stderr: str
+    command: list[str] | None = None
+    board: str | None = None
 
 
 class WestExecutor:
@@ -42,11 +44,16 @@ class WestExecutor:
         cmd = ["west", "build", "-b", board]
         if pristine:
             cmd.extend(["-p", "always"])
-        return self._run(cmd, project_dir, project_dir.name, "build")
+        result = self._run(cmd, project_dir, project_dir.name, "build")
+        result.command = cmd
+        result.board = board
+        return result
 
     def flash(self, project_dir: Path) -> ExecutionResult:
         cmd = ["west", "flash"]
-        return self._run(cmd, project_dir, project_dir.name, "flash")
+        result = self._run(cmd, project_dir, project_dir.name, "flash")
+        result.command = cmd
+        return result
 
     def _run(
         self,

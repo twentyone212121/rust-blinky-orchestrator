@@ -9,35 +9,40 @@ from .core import ExecutionResult
 
 class SessionLogger:
     def __init__(self, log_dir: Path) -> None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._session_dir = log_dir / timestamp
-        self._session_dir.mkdir(parents=True, exist_ok=True)
+        self._log_file = log_dir / "orchestrator.jsonl"
+        self._log_file.parent.mkdir(parents=True, exist_ok=True)
+        self._session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     @property
-    def session_dir(self) -> Path:
-        return self._session_dir
+    def log_file(self) -> Path:
+        return self._log_file
 
-    def log_operation(self, result: ExecutionResult) -> Path:
+    def log_operation(self, result: ExecutionResult) -> None:
         data = {
+            "type": "operation",
+            "session_id": self._session_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "project": result.project_name,
             "operation": result.operation,
+            "board": result.board,
+            "command": result.command,
             "success": result.success,
             "return_code": result.return_code,
             "duration_seconds": result.duration_seconds,
             "stdout": result.stdout,
             "stderr": result.stderr,
         }
-        path = self._session_dir / f"{result.project_name}_{result.operation}.json"
-        path.write_text(json.dumps(data, indent=2) + "\n")
-        return path
+        with self._log_file.open("a") as f:
+            f.write(json.dumps(data) + "\n")
 
     def log_session_summary(
         self,
         results: list[ExecutionResult],
         total_duration: float,
-    ) -> Path:
+    ) -> None:
         data = {
+            "type": "summary",
+            "session_id": self._session_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "total_duration_seconds": round(total_duration, 1),
             "operations": [
@@ -51,6 +56,5 @@ class SessionLogger:
             ],
             "all_succeeded": all(r.success for r in results),
         }
-        path = self._session_dir / "session_summary.json"
-        path.write_text(json.dumps(data, indent=2) + "\n")
-        return path
+        with self._log_file.open("a") as f:
+            f.write(json.dumps(data) + "\n")

@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> None:
 
     total_duration = time.perf_counter() - session_start
     logger.log_session_summary(results, total_duration)
-    print(f"\nLogs saved to: {logger.session_dir}")
+    print(f"\nLogs saved to: {logger.log_file}")
 
     if any(not r.success for r in results):
         sys.exit(1)
