@@ -52,30 +52,29 @@ source .venv/bin/activate
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                Python Orchestrator                      │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │  CLI (argparse)                                 │    │
-│  │  - build/flash commands                         │    │
-│  │  - target selection (c/rust/both)               │    │
-│  └──────────────┬──────────────────────────────────┘    │
-│                 │                                       │
-│                 v                                       │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │  West Executor (subprocess)                     │    │
-│  │  - Spawns: west build / west flash              │    │
-│  │  - Captures: stdout/stderr                      │    │
-│  │  - Handles: errors, timeouts                    │    │
-│  └──────────────┬──────────────────────────────────┘    │
-│                 │                                       │
-│                 v                                       │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │  Log Manager                                    │    │
-│  │  - JSONL append to logs/orchestrator.jsonl      │    │
-│  │  - Session ID correlates related entries        │    │
-│  │  - Success/failure tracking                     │    │
-│  └─────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│                Python Orchestrator                    │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │  CLI (argparse)                                 │  │
+│  │  - build/flash commands                         │  │
+│  │  - target project                               │  │
+│  └──────────────┬──────────────────────────────────┘  │
+│                 │                                     │
+│                 v                                     │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │  West Executor (subprocess)                     │  │
+│  │  - Spawns: west build / west flash              │  │
+│  │  - Captures: stdout/stderr                      │  │
+│  └──────────────┬──────────────────────────────────┘  │
+│                 │                                     │
+│                 v                                     │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │  Log Manager                                    │  │
+│  │  - JSONL append to logs/orchestrator.jsonl      │  │
+│  │  - Session ID correlates related entries        │  │
+│  │  - Success/failure tracking                     │  │
+│  └─────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────┘
                          │
                          │ invokes
                          v
@@ -172,15 +171,6 @@ rust-blinky-orchestrator/
 - Check board connection: `LinkServer probes`
 - Use data-capable USB cable
 - Connect to MCU-LINK/Debug port
-
-## Status
-
-- ✅ C Implementation - Complete
-- ✅ Rust Implementation - Complete (hardware testing done)
-- ✅ Python Orchestrator - Complete (JSONL logging)
-- ⬜ Sample Logs - Pending
-
-See `docs/progress.md` for detailed task completion status.
 
 ## Author
 
